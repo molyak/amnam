@@ -76,35 +76,46 @@
     }
 
     function register() {
-      const username = document.getElementById("regNick").value;
-      const password = document.getElementById("regPass").value;
-      const uid = generateUID();
-      if (users[username]) return alert("Пользователь уже существует");
-      const userData = {
-        username,
-        password,
-        regDate: new Date().toISOString(),
-        purchases: [],
-        uid,
-        isAdmin: false,
-        isBlocked: false
-      };
-      users[username] = userData;
-      localStorage.setItem("users", JSON.stringify(users));
+  const username = document.getElementById("regNick").value;
+  const password = document.getElementById("regPass").value;
+
+  fetch('https://amnam-st01.onrender.com/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
       localStorage.setItem("amnam_user", username);
-      syncUserWithServer(userData);
+      alert("Успешно зарегистрирован!");
       location.reload();
+    } else {
+      alert(data.error || "Ошибка регистрации");
     }
+  });
+}
 
     function login() {
-      const username = document.getElementById("loginNick").value;
-      const password = document.getElementById("loginPass").value;
-      if (!users[username] || users[username].password !== password || users[username].isBlocked) {
-        return alert("Неверный ник, пароль или вы заблокированы");
-      }
+  const username = document.getElementById("loginNick").value;
+  const password = document.getElementById("loginPass").value;
+
+  fetch('https://amnam-st01.onrender.com/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
       localStorage.setItem("amnam_user", username);
+      alert("Вход выполнен");
       location.reload();
+    } else {
+      alert(data.error || "Ошибка входа");
     }
+  });
+}
 
     function logout() {
       localStorage.removeItem("amnam_user");
@@ -131,24 +142,33 @@
       document.getElementById('profile').classList.remove('hidden');
     }
 
-    window.onload = () => {
-      if (currentUser && users[currentUser]) {
-        document.getElementById("loginBtn").style.display = "none";
-        document.getElementById("registerBtn").style.display = "none";
-        const user = users[currentUser];
-        document.getElementById("profileInfo").innerHTML = `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
-        const profileContent = document.getElementById("profileContent");
-        profileContent.innerHTML = `
-          <p><b>Ник:</b> ${user.username}</p>
-          <p><b>UID:</b> ${user.uid}</p>
-          <p><b>Дата регистрации:</b> ${new Date(user.regDate).toLocaleDateString()}</p>
-          <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
-          <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(", ") : "—"}</p>
-        `;
-        // Синхронизация при входе
-        syncUserWithServer(user);
+   window.onload = () => {
+  const username = localStorage.getItem("amnam_user");
+  if (!username) return;
+
+  fetch(`https://amnam-st01.onrender.com/users/${username}`)
+    .then(res => res.json())
+    .then(user => {
+      if (!user || user.isBlocked) {
+        alert("Пользователь заблокирован или не найден");
+        localStorage.removeItem("amnam_user");
+        return;
       }
-    }
+
+      document.getElementById("loginBtn").style.display = "none";
+      document.getElementById("registerBtn").style.display = "none";
+      document.getElementById("profileInfo").innerHTML =
+        `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
+      const profileContent = document.getElementById("profileContent");
+      profileContent.innerHTML = `
+        <p><b>Ник:</b> ${user.username}</p>
+        <p><b>UID:</b> ${user.uid}</p>
+        <p><b>Дата регистрации:</b> ${new Date(user.regDate).toLocaleDateString()}</p>
+        <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
+        <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(", ") : "—"}</p>
+      `;
+    });
+};
   </script>
 </head>
 <body>
