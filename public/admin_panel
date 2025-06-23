@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amnam Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f1912, #14532d);
+      background-size: 400% 400%;
+      animation: gradientFlow 15s ease infinite;
+      color: #e0ffe5;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    @keyframes gradientFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .fade-in {
+      opacity: 0;
+      transform: translateY(30px);
+      animation: fadeIn 1s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body class="p-6">
+  <div id="adminPanel" class="max-w-4xl mx-auto hidden fade-in">
+    <h1 class="text-3xl font-bold text-green-400 mb-6 text-center">Админ-панель Amnam</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Выдать товар -->
+      <div class="bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-xl font-semibold mb-4">Выдать товар</h2>
+        <input type="text" id="giveNick" placeholder="Ник" class="w-full mb-3 p-2 rounded bg-gray-700">
+        <select id="giveProduct" class="w-full mb-3 p-2 rounded bg-gray-700">
+          <option value="30">30 дней</option>
+          <option value="365">365 дней</option>
+          <option value="forever">Навсегда</option>
+        </select>
+        <button onclick="giveProduct()" class="w-full bg-green-600 hover:bg-green-700 p-2 rounded transition">Выдать</button>
+      </div>
+
+      <!-- Выдать админку -->
+      <div class="bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-xl font-semibold mb-4">Выдать админку</h2>
+        <input type="text" id="adminNick" placeholder="Ник" class="w-full mb-3 p-2 rounded bg-gray-700">
+        <button onclick="giveAdmin()" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded transition">Сделать админом</button>
+      </div>
+
+      <!-- Блокировка -->
+      <div class="bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-xl font-semibold mb-4">Блокировка пользователя</h2>
+        <input type="text" id="banNick" placeholder="Ник" class="w-full mb-3 p-2 rounded bg-gray-700">
+        <button onclick="blockUser()" class="w-full bg-red-600 hover:bg-red-700 p-2 rounded transition">Заблокировать</button>
+      </div>
+
+      <!-- Разблокировка -->
+      <div class="bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-xl font-semibold mb-4">Разблокировка пользователя</h2>
+        <input type="text" id="unbanNick" placeholder="Ник" class="w-full mb-3 p-2 rounded bg-gray-700">
+        <button onclick="unblockUser()" class="w-full bg-yellow-600 hover:bg-yellow-700 p-2 rounded transition">Разблокировать</button>
+      </div>
+
+      <!-- Генерация ключа -->
+      <div class="bg-gray-800 p-6 rounded-2xl shadow-xl col-span-full">
+        <h2 class="text-xl font-semibold mb-4">Генерация ключа</h2>
+        <select id="keyType" class="w-full mb-3 p-2 rounded bg-gray-700">
+          <option value="30">30 дней</option>
+          <option value="365">365 дней</option>
+          <option value="forever">Навсегда</option>
+        </select>
+        <button onclick="generateKey()" class="w-full bg-purple-600 hover:bg-purple-700 p-2 rounded transition">Сгенерировать ключ</button>
+        <p id="keyOutput" class="mt-3 text-green-300 text-center"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    fetch('https://amnam-st01.onrender.com/users')
+      .then(res => res.json())
+      .then(users => {
+        const current = localStorage.getItem('amnam_user');
+        const user = users.find(u => u.username === current);
+        if (user && user.is_admin) {
+          document.getElementById('adminPanel').classList.remove('hidden');
+        } else {
+          alert("Доступ запрещён: вы не админ");
+        }
+      });
+
+    function apiCall(path, data, onSuccessText) {
+      fetch(`https://amnam-st01.onrender.com/admin/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(res => res.json()).then(data => {
+        if (data.success) alert(onSuccessText);
+        else alert(data.error || 'Ошибка');
+      });
+    }
+
+    function giveProduct() {
+      apiCall('give-product', {
+        username: document.getElementById('giveNick').value,
+        product: document.getElementById('giveProduct').value
+      }, 'Товар выдан');
+    }
+
+    function giveAdmin() {
+      apiCall('give-admin', {
+        username: document.getElementById('adminNick').value
+      }, 'Админка выдана');
+    }
+
+    function blockUser() {
+      apiCall('block-user', {
+        username: document.getElementById('banNick').value
+      }, 'Пользователь заблокирован');
+    }
+
+    function unblockUser() {
+      apiCall('unblock-user', {
+        username: document.getElementById('unbanNick').value
+      }, 'Пользователь разблокирован');
+    }
+
+    function generateKey() {
+      fetch('https://amnam-st01.onrender.com/admin/generate-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration: document.getElementById('keyType').value })
+      }).then(res => res.json()).then(data => {
+        if (data.key) document.getElementById('keyOutput').textContent = 'Ключ: ' + data.key;
+        else alert(data.error || 'Ошибка');
+      });
+    }
+  </script>
+</body>
+</html>
