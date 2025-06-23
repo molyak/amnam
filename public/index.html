@@ -54,58 +54,36 @@
     }
   </style>
   <script>
-    async function syncUserWithServer(user) {
-      try {
-        const res = await fetch('https://amnam-st01.onrender.com/sync-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(user)
-        });
-        const data = await res.json();
-        console.log('[SYNC]', data);
-      } catch (err) {
-        console.error('Ошибка при синхронизации с сервером:', err);
-      }
-    }
-
     const users = JSON.parse(localStorage.getItem('users')) || {};
     const currentUser = localStorage.getItem('amnam_user');
+    const keys = JSON.parse(localStorage.getItem('activation_keys')) || [];
+
+    function register() {
+      const username = document.getElementById("regNick").value;
+      const password = document.getElementById("regPass").value;
+      const uid = generateUID();
+      if (users[username]) return alert("Пользователь уже существует");
+      users[username] = {
+        username, password, regDate: new Date().toISOString(), purchases: [], uid, isAdmin: false, isBlocked: false
+      };
+      localStorage.setItem("users", JSON.stringify(users));
+      localStorage.setItem("amnam_user", username);
+      location.reload();
+    }
 
     function generateUID() {
       return Math.random().toString(36).substring(2, 10);
     }
 
-    // Регистрация
-async function register() {
-  const username = document.getElementById("regNick").value;
-  const password = document.getElementById("regPass").value;
-  const res = await fetch('/api/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  if (data.error) return alert(data.error);
-  localStorage.setItem("amnam_user", data.username);
-  localStorage.setItem("amnam_uid", data.uid);
-  location.reload();
-}
-
-// Вход
-async function login() {
-  const username = document.getElementById("loginNick").value;
-  const password = document.getElementById("loginPass").value;
-  const res = await fetch('/api/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  if (data.error) return alert(data.error);
-  localStorage.setItem("amnam_user", data.username);
-  localStorage.setItem("amnam_uid", data.uid);
-  location.reload();
-}
+    function login() {
+      const username = document.getElementById("loginNick").value;
+      const password = document.getElementById("loginPass").value;
+      if (!users[username] || users[username].password !== password || users[username].isBlocked) {
+        return alert("Неверный ник, пароль или вы заблокированы");
+      }
+      localStorage.setItem("amnam_user", username);
+      location.reload();
+    }
 
     function logout() {
       localStorage.removeItem("amnam_user");
@@ -132,60 +110,38 @@ async function login() {
       document.getElementById('profile').classList.remove('hidden');
     }
 
-   window.onload = () => {
-  const username = localStorage.getItem("amnam_user");
-  if (!username) return;
-
-  fetch(`https://amnam-st01.onrender.com/users/${username}`)
-    .then(res => res.json())
-    .then(user => {
-      if (!user || user.isBlocked) {
-        alert("Пользователь заблокирован или не найден");
-        localStorage.removeItem("amnam_user");
-        return;
-      }
-      <script>
- 
-      async function showCodePrompt() {
-    const code = prompt("Введите секретный код:");
-    if (!code) return;
-
-    const res = await fetch('/api/validate-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      document.getElementById("adminPanel").classList.remove("hidden");
-      document.getElementById("adminTitle").textContent = "Админ-панель";
-    } else {
-      alert("Неверный код");
+    function activateKey() {
+      const enteredKey = document.getElementById("keyInput").value.trim();
+      if (!enteredKey) return;
+      const index = keys.indexOf(enteredKey);
+      if (index === -1) return alert("Неверный ключ");
+      users[currentUser].purchases.push("Активирован по ключу");
+      keys.splice(index, 1);
+      localStorage.setItem("activation_keys", JSON.stringify(keys));
+      localStorage.setItem("users", JSON.stringify(users));
+      alert("Ключ активирован! Товар выдан.");
+      showProfile();
     }
-  }
-</script>
 
-      document.getElementById("loginBtn").style.display = "none";
-      document.getElementById("registerBtn").style.display = "none";
-      document.getElementById("profileInfo").innerHTML =
-        `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
-      const profileContent = document.getElementById("profileContent");
-      profileContent.innerHTML = `
-        <p><b>Ник:</b> ${user.username}</p>
-        <p><b>UID:</b> ${user.uid}</p>
-        <p><b>Дата регистрации:</b> ${new Date(user.regDate).toLocaleDateString()}</p>
-        <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
-        <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(", ") : "—"}</p>
-      `;
-    });
-};
+    window.onload = () => {
+      if (currentUser && users[currentUser]) {
+        document.getElementById("loginBtn").style.display = "none";
+        document.getElementById("registerBtn").style.display = "none";
+        const user = users[currentUser];
+        document.getElementById("profileInfo").innerHTML = `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
+        const profileContent = document.getElementById("profileContent");
+        profileContent.innerHTML = `
+          <p><b>Ник:</b> ${user.username}</p>
+          <p><b>UID:</b> ${user.uid}</p>
+          <p><b>Дата регистрации:</b> ${new Date(user.regDate).toLocaleDateString()}</p>
+          <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
+          <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(", ") : "—"}</p>
+        `;
+      }
+    }
   </script>
 </head>
 <body>
-  <!-- Твоя разметка остаётся той же (шапка, mainBlock, секции и т.д.) -->
-</body>
-</html>
 <header class="flex justify-between items-center px-6 py-4 border-b border-green-800">
   <div class="flex items-center space-x-3">
     <img src="https://grizly.club/uploads/posts/2023-02/1676201923_grizly-club-p-klipart-am-nyam-2.png" class="w-8 h-8"/>
