@@ -2,6 +2,7 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -36,8 +37,8 @@ app.post('/register', (req, res) => {
     'INSERT INTO users (username, password, uid) VALUES (?, ?, ?)',
     [username, password, uid],
     function (err) {
-      if (err) return res.status(500).send('Ошибка регистрации');
-      res.send('Пользователь зарегистрирован');
+      if (err) return res.status(500).json({ error: 'Ошибка регистрации' });
+      res.json({ success: true });
     }
   );
 });
@@ -50,7 +51,7 @@ app.post('/login', (req, res) => {
     [username, password],
     (err, row) => {
       if (err || !row) return res.status(401).json({ error: 'Неверные данные' });
-      res.json(row);
+      res.json({ success: true, ...row });
     }
   );
 });
@@ -60,6 +61,15 @@ app.get('/users', (req, res) => {
   db.all('SELECT * FROM users', (err, rows) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     res.json(rows);
+  });
+});
+
+// Получение конкретного пользователя
+app.get('/user/:username', (req, res) => {
+  const username = req.params.username;
+  db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
+    if (err || !row) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json(row);
   });
 });
 
@@ -107,6 +117,17 @@ app.post('/activate-key', (req, res) => {
   });
 });
 
+// Маршрут по умолчанию (чтобы не было Cannot GET /)
+app.get('/', (req, res) => {
+  res.send('🚀 Amnam API работает! Вы можете подключиться к клиенту.');
+});
+
+// Если вы подключаете фронтенд (опционально):
+// app.use(express.static(path.join(__dirname, 'client_dist')));
+// app.get('*', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'client_dist', 'index.html'));
+// });
+
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`✅ Сервер запущен на порту ${port}`);
 });
