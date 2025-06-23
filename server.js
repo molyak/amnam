@@ -7,6 +7,18 @@ const path = require('path');
 
 const app = express();
 const db = new sqlite3.Database('database.sqlite');
+// Добавь это рядом с другими роутами
+const SECRET_CODE = "a1m2n3a4m5c6l7i8e9n10t11";
+
+// Проверка кода
+app.post('/api/validate-code', (req, res) => {
+  const { code } = req.body;
+  if (code === SECRET_CODE) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false });
+  }
+});
 
 app.use(cors());
 app.use(express.json());
