@@ -64,7 +64,7 @@ app.post('/activate-key', (req, res) => {
   db.get('SELECT * FROM activation_keys WHERE key = ?', [key], (err, row) => {
     if (!row) return res.status(400).json({ error: 'Неверный ключ' });
     db.run('DELETE FROM activation_keys WHERE key = ?', [key]);
-    db.run('UPDATE users SET purchases = json_insert(purchases, '$[#]', ?) WHERE username = ?',
+    db.run(`UPDATE users SET purchases = json_insert(purchases, '$[#]', ?) WHERE username = ?`, [purchase, username]);
       ['Клиент активирован по ключу', username]);
     res.json({ success: true });
   });
