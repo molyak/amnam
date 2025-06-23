@@ -75,46 +75,36 @@
       return Math.random().toString(36).substring(2, 10);
     }
 
-    function register() {
+    // Регистрация
+async function register() {
   const username = document.getElementById("regNick").value;
   const password = document.getElementById("regPass").value;
-
-  fetch('https://amnam-st01.onrender.com/auth/register', {
+  const res = await fetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      localStorage.setItem("amnam_user", username);
-      alert("Успешно зарегистрирован!");
-      location.reload();
-    } else {
-      alert(data.error || "Ошибка регистрации");
-    }
   });
+  const data = await res.json();
+  if (data.error) return alert(data.error);
+  localStorage.setItem("amnam_user", data.username);
+  localStorage.setItem("amnam_uid", data.uid);
+  location.reload();
 }
 
-    function login() {
+// Вход
+async function login() {
   const username = document.getElementById("loginNick").value;
   const password = document.getElementById("loginPass").value;
-
-  fetch('https://amnam-st01.onrender.com/auth/login', {
+  const res = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      localStorage.setItem("amnam_user", username);
-      alert("Вход выполнен");
-      location.reload();
-    } else {
-      alert(data.error || "Ошибка входа");
-    }
   });
+  const data = await res.json();
+  if (data.error) return alert(data.error);
+  localStorage.setItem("amnam_user", data.username);
+  localStorage.setItem("amnam_uid", data.uid);
+  location.reload();
 }
 
     function logout() {
