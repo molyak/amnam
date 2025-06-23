@@ -1,21 +1,14 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const cors = require('cors');
-const bodyParser = require('body-parser');
+const app = express();
 const path = require('path');
 
-const app = express();
-const port = process.env.PORT || 3000;
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public'))); // обслуживает index.html и другие
 
-app.use(cors());
-app.use(bodyParser.json());
-
-// 📁 Раздача клиентских файлов
-app.use(express.static(path.join(__dirname, 'public')));
+// Пример: возврат index.html по умолчанию
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
 // 📦 База данных
 const db = new sqlite3.Database('database.sqlite');
 
