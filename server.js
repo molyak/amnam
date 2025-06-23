@@ -2,84 +2,136 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
-const crypto = require('crypto');
+const crypto = require("crypto");
 const path = require('path');
 
 const app = express();
-const db = new sqlite3.Database('database.sqlite');
-// Добавь это рядом с другими роутами
+const PORT = process.env.PORT || 3000;
 const SECRET_CODE = "a1m2n3a4m5c6l7i8e9n10t11";
 
-// Проверка кода
-app.post('/api/validate-code', (req, res) => {
-  const { code } = req.body;
-  if (code === SECRET_CODE) {
-    res.json({ success: true });
-  } else {
-    res.json({ success: false });
-  }
-});
-
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Создание таблицы пользователей
+// SQLite init
+const db = new sqlite3.Database('database.sqlite');
+db.run(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    uid TEXT,
+    is_admin INTEGER DEFAULT 0,
+    is_blocked INTEGER DEFAULT 0
+  )
+`);
 
-db.run(`CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE,
-  password TEXT,
-  uid TEXT,
-  is_admin INTEGER DEFAULT 0,
-  is_blocked INTEGER DEFAULT 0,
-  token TEXT
-)`);
+db.run(`
+  CREATE TABLE IF NOT EXISTS keys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT,
+    expires_at TEXT,
+    used INTEGER DEFAULT 0
+  )
+`);
+
+// UID Generator
+function generateUID() {
+  return crypto.randomBytes(6).toString("hex");
+}
+
+// Генерация ключа
+function generateKey(duration) {
+  const key = crypto.randomBytes(8).toString("hex");
+  let expires_at = null;
+  if (duration === '30') {
+    expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
+  } else if (duration === '365') {
+    expires_at = new Date(Date.now() + 365 * 86400000).toISOString();
+  }
+  return { key, expires_at };
+}
 
 // Регистрация
-app.post('/register', (req, res) => {
+app.post('/api/register', (req, res) => {
   const { username, password } = req.body;
-  const uid = crypto.randomBytes(4).toString('hex');
-  const token = crypto.randomBytes(16).toString('hex');
+  if (!username || !password) return res.json({ error: "Неверные данные" });
 
-  db.get("SELECT * FROM users WHERE username = ?", [username], (err, row) => {
-    if (row) return res.json({ error: 'Пользователь уже существует' });
+  db.get('SELECT * FROM users WHERE username = ?', [username], (err, existing) => {
+    if (err) return res.json({ error: "Ошибка базы данных" });
+    if (existing) return res.json({ error: "Пользователь уже существует" });
 
-    db.run("INSERT INTO users (username, password, uid, token) VALUES (?, ?, ?, ?)",
-      [username, password, uid, token], (err) => {
-        if (err) return res.json({ error: 'Ошибка при регистрации' });
-        res.json({ token });
-      });
+    const uid = generateUID();
+    db.run('INSERT INTO users (username, password, uid) VALUES (?, ?, ?)', [username, password, uid], err => {
+      if (err) return res.json({ error: "Ошибка при регистрации" });
+      res.json({ success: true, username, uid });
+    });
   });
 });
 
 // Вход
-app.post('/login', (req, res) => {
+app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-
-  db.get("SELECT * FROM users WHERE username = ? AND password = ?", [username, password], (err, row) => {
-    if (!row) return res.json({ error: 'Неверный логин или пароль' });
-    if (row.is_blocked) return res.json({ error: 'Вы заблокированы' });
-
-    res.json({ token: row.token });
+  db.get('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, user) => {
+    if (err || !user) return res.json({ error: "Неверный логин или пароль" });
+    res.json({ success: true, username: user.username, uid: user.uid, is_admin: user.is_admin });
   });
 });
 
-// Получение профиля
-app.get('/me', (req, res) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+// Проверка секретного кода
+app.post('/api/validate-code', (req, res) => {
+  const { code } = req.body;
+  res.json({ success: code === SECRET_CODE });
+});
 
-  if (!token) return res.status(401).json({ error: 'Нет токена' });
+// Генерация ключа
+app.post('/api/admin/generate-key', (req, res) => {
+  const { duration } = req.body;
+  const { key, expires_at } = generateKey(duration);
+  db.run('INSERT INTO keys (key, expires_at) VALUES (?, ?)', [key, expires_at], err => {
+    if (err) return res.json({ error: 'Ошибка генерации' });
+    res.json({ success: true, key });
+  });
+});
 
-  db.get("SELECT username, uid, is_admin, is_blocked FROM users WHERE token = ?", [token], (err, user) => {
-    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-    res.json(user);
+// Выдать админку
+app.post('/api/admin/give-admin', (req, res) => {
+  const { username } = req.body;
+  db.run('UPDATE users SET is_admin = 1 WHERE username = ?', [username], err => {
+    if (err) return res.json({ error: 'Ошибка базы данных' });
+    res.json({ success: true });
+  });
+});
+
+// Заблокировать пользователя
+app.post('/api/admin/block-user', (req, res) => {
+  const { username } = req.body;
+  db.run('UPDATE users SET is_blocked = 1 WHERE username = ?', [username], err => {
+    if (err) return res.json({ error: 'Ошибка базы данных' });
+    res.json({ success: true });
+  });
+});
+
+// Разблокировать пользователя
+app.post('/api/admin/unblock-user', (req, res) => {
+  const { username } = req.body;
+  db.run('UPDATE users SET is_blocked = 0 WHERE username = ?', [username], err => {
+    if (err) return res.json({ error: 'Ошибка базы данных' });
+    res.json({ success: true });
+  });
+});
+
+// Выдать товар (запись в purchases не требуется для демо)
+app.post('/api/admin/give-product', (req, res) => {
+  const { username } = req.body;
+  db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
+    if (err || !user) return res.json({ error: "Пользователь не найден" });
+    res.json({ success: true });
   });
 });
 
 // Запуск сервера
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
+  console.log(`Сервер запущен на порту ${PORT}`);
 });
-
