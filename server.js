@@ -1,137 +1,95 @@
-// server.js
-const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const cors = require('cors');
-const crypto = require("crypto");
-const path = require('path');
+const currentUser = localStorage.getItem('amnam_user');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const SECRET_CODE = "a1m2n3a4m5c6l7i8e9n10t11";
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// SQLite init
-const db = new sqlite3.Database('database.sqlite');
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    uid TEXT,
-    is_admin INTEGER DEFAULT 0,
-    is_blocked INTEGER DEFAULT 0
-  )
-`);
-
-db.run(`
-  CREATE TABLE IF NOT EXISTS keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    key TEXT,
-    expires_at TEXT,
-    used INTEGER DEFAULT 0
-  )
-`);
-
-// UID Generator
-function generateUID() {
-  return crypto.randomBytes(6).toString("hex");
-}
-
-// Генерация ключа
-function generateKey(duration) {
-  const key = crypto.randomBytes(8).toString("hex");
-  let expires_at = null;
-  if (duration === '30') {
-    expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
-  } else if (duration === '365') {
-    expires_at = new Date(Date.now() + 365 * 86400000).toISOString();
-  }
-  return { key, expires_at };
-}
-
-// Регистрация
-app.post('/api/register', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.json({ error: "Неверные данные" });
-
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, existing) => {
-    if (err) return res.json({ error: "Ошибка базы данных" });
-    if (existing) return res.json({ error: "Пользователь уже существует" });
-
-    const uid = generateUID();
-    db.run('INSERT INTO users (username, password, uid) VALUES (?, ?, ?)', [username, password, uid], err => {
-      if (err) return res.json({ error: "Ошибка при регистрации" });
-      res.json({ success: true, username, uid });
+function register() {
+  const username = document.getElementById('regNick').value;
+  const password = document.getElementById('regPass').value;
+  fetch('http://localhost:3000/api/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) return alert(data.error);
+      localStorage.setItem('amnam_user', username);
+      location.reload();
     });
-  });
-});
+}
 
-// Вход
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  db.get('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, user) => {
-    if (err || !user) return res.json({ error: "Неверный логин или пароль" });
-    res.json({ success: true, username: user.username, uid: user.uid, is_admin: user.is_admin });
-  });
-});
+function login() {
+  const username = document.getElementById('loginNick').value;
+  const password = document.getElementById('loginPass').value;
+  fetch('http://localhost:3000/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) return alert(data.error);
+      localStorage.setItem('amnam_user', username);
+      location.reload();
+    });
+}
 
-// Проверка секретного кода
-app.post('/api/validate-code', (req, res) => {
-  const { code } = req.body;
-  res.json({ success: code === SECRET_CODE });
-});
+function logout() {
+  localStorage.removeItem('amnam_user');
+  location.reload();
+}
 
-// Генерация ключа
-app.post('/api/admin/generate-key', (req, res) => {
-  const { duration } = req.body;
-  const { key, expires_at } = generateKey(duration);
-  db.run('INSERT INTO keys (key, expires_at) VALUES (?, ?)', [key, expires_at], err => {
-    if (err) return res.json({ error: 'Ошибка генерации' });
-    res.json({ success: true, key });
-  });
-});
+function showMain() {
+  document.getElementById('mainBlock').classList.remove('hidden');
+  document.getElementById('products').classList.add('hidden');
+  document.getElementById('profile').classList.add('hidden');
+}
 
-// Выдать админку
-app.post('/api/admin/give-admin', (req, res) => {
-  const { username } = req.body;
-  db.run('UPDATE users SET is_admin = 1 WHERE username = ?', [username], err => {
-    if (err) return res.json({ error: 'Ошибка базы данных' });
-    res.json({ success: true });
-  });
-});
+function showProducts() {
+  if (!currentUser) return alert('Сначала войдите в аккаунт');
+  document.getElementById('mainBlock').classList.add('hidden');
+  document.getElementById('products').classList.remove('hidden');
+  document.getElementById('profile').classList.add('hidden');
+}
 
-// Заблокировать пользователя
-app.post('/api/admin/block-user', (req, res) => {
-  const { username } = req.body;
-  db.run('UPDATE users SET is_blocked = 1 WHERE username = ?', [username], err => {
-    if (err) return res.json({ error: 'Ошибка базы данных' });
-    res.json({ success: true });
-  });
-});
+function showProfile() {
+  if (!currentUser) return alert('Сначала войдите в аккаунт');
+  document.getElementById('mainBlock').classList.add('hidden');
+  document.getElementById('products').classList.add('hidden');
+  document.getElementById('profile').classList.remove('hidden');
+}
 
-// Разблокировать пользователя
-app.post('/api/admin/unblock-user', (req, res) => {
-  const { username } = req.body;
-  db.run('UPDATE users SET is_blocked = 0 WHERE username = ?', [username], err => {
-    if (err) return res.json({ error: 'Ошибка базы данных' });
-    res.json({ success: true });
-  });
-});
+function activateKey() {
+  const enteredKey = document.getElementById('keyInput').value.trim();
+  if (!enteredKey) return alert('Введите ключ');
+  fetch('http://localhost:3000/api/activate-key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: enteredKey, username: currentUser }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) return alert(data.error);
+      alert('Ключ активирован! Товар выдан.');
+      showProfile();
+    });
+}
 
-// Выдать товар (запись в purchases не требуется для демо)
-app.post('/api/admin/give-product', (req, res) => {
-  const { username } = req.body;
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
-    if (err || !user) return res.json({ error: "Пользователь не найден" });
-    res.json({ success: true });
-  });
-});
-
-// Запуск сервера
-app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
-});
+window.onload = () => {
+  if (currentUser) {
+    fetch(`http://localhost:3000/api/user/${currentUser}`)
+      .then((res) => res.json())
+      .then((user) => {
+        if (user.error) return alert(user.error);
+        document.getElementById('loginBtn').style.display = 'none';
+        document.getElementById('registerBtn').style.display = 'none';
+        document.getElementById('profileInfo').innerHTML = `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
+        const profileContent = document.getElementById('profileContent');
+        profileContent.innerHTML = `
+          <p><b>Ник:</b> ${user.username}</p>
+          <p><b>UID:</b> ${user.uid}</p>
+          <p><b>Дата регистрации:</b> ${new Date(user.reg_date).toLocaleDateString()}</p>
+          <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
+          <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(', ') : '—'}</p>
+        `;
+      });
+  }
+};
