@@ -154,6 +154,27 @@
         localStorage.removeItem("amnam_user");
         return;
       }
+      <script>
+ 
+      async function showCodePrompt() {
+    const code = prompt("Введите секретный код:");
+    if (!code) return;
+
+    const res = await fetch('/api/validate-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      document.getElementById("adminPanel").classList.remove("hidden");
+      document.getElementById("adminTitle").textContent = "Админ-панель";
+    } else {
+      alert("Неверный код");
+    }
+  }
+</script>
 
       document.getElementById("loginBtn").style.display = "none";
       document.getElementById("registerBtn").style.display = "none";
