@@ -1,120 +1,73 @@
+// server.js
 const express = require('express');
-const app = express();
+const sqlite3 = require('sqlite3').verbose();
+const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // обслуживает index.html и другие
-
-// Пример: возврат index.html по умолчанию
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-// 📦 База данных
+const app = express();
 const db = new sqlite3.Database('database.sqlite');
 
-// ▶️ Создание таблиц
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      username TEXT PRIMARY KEY,
-      password TEXT NOT NULL,
-      uid TEXT NOT NULL,
-      purchases TEXT DEFAULT '[]',
-      is_admin INTEGER DEFAULT 0
-    )
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS activation_keys (
-      key TEXT PRIMARY KEY
-    )
-  `);
-});
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
 
-// ✅ Регистрация
+// Создание таблицы пользователей
+
+db.run(`CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE,
+  password TEXT,
+  uid TEXT,
+  is_admin INTEGER DEFAULT 0,
+  is_blocked INTEGER DEFAULT 0,
+  token TEXT
+)`);
+
+// Регистрация
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
-  const uid = Math.random().toString(36).substring(2, 10);
-  db.run(
-    'INSERT INTO users (username, password, uid) VALUES (?, ?, ?)',
-    [username, password, uid],
-    function (err) {
-      if (err) return res.status(500).json({ error: 'Пользователь уже существует' });
-      res.json({ success: true });
-    }
-  );
+  const uid = crypto.randomBytes(4).toString('hex');
+  const token = crypto.randomBytes(16).toString('hex');
+
+  db.get("SELECT * FROM users WHERE username = ?", [username], (err, row) => {
+    if (row) return res.json({ error: 'Пользователь уже существует' });
+
+    db.run("INSERT INTO users (username, password, uid, token) VALUES (?, ?, ?, ?)",
+      [username, password, uid, token], (err) => {
+        if (err) return res.json({ error: 'Ошибка при регистрации' });
+        res.json({ token });
+      });
+  });
 });
 
-// ✅ Вход
+// Вход
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  db.get(
-    'SELECT * FROM users WHERE username = ? AND password = ?',
-    [username, password],
-    (err, row) => {
-      if (err || !row) return res.status(401).json({ error: 'Неверные данные' });
-      res.json({ success: true, ...row });
-    }
-  );
-});
 
-// ✅ Получение всех пользователей
-app.get('/users', (req, res) => {
-  db.all('SELECT * FROM users', (err, rows) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
-    res.json(rows);
+  db.get("SELECT * FROM users WHERE username = ? AND password = ?", [username, password], (err, row) => {
+    if (!row) return res.json({ error: 'Неверный логин или пароль' });
+    if (row.is_blocked) return res.json({ error: 'Вы заблокированы' });
+
+    res.json({ token: row.token });
   });
 });
 
-// ✅ Получение одного пользователя
-app.get('/user/:username', (req, res) => {
-  const { username } = req.params;
-  db.get('SELECT * FROM users WHERE username = ?', [username], (err, row) => {
-    if (err || !row) return res.status(404).json({ error: 'Пользователь не найден' });
-    res.json(row);
+// Получение профиля
+app.get('/me', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+
+  db.get("SELECT username, uid, is_admin, is_blocked FROM users WHERE token = ?", [token], (err, user) => {
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json(user);
   });
 });
 
-// ✅ Выдача админки
-app.post('/admin/give-admin', (req, res) => {
-  const { username } = req.body;
-  db.run(
-    'UPDATE users SET is_admin = 1 WHERE username = ?',
-    [username],
-    function (err) {
-      if (err || this.changes === 0)
-        return res.status(400).json({ error: 'Пользователь не найден' });
-      res.json({ success: true });
-    }
-  );
+// Запуск сервера
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Сервер запущен на http://localhost:${PORT}`);
 });
 
-// ✅ Генерация ключа
-app.post('/admin/generate-key', (req, res) => {
-  const key = Math.random().toString(36).substring(2, 10).toUpperCase();
-  db.run('INSERT INTO activation_keys (key) VALUES (?)', [key], function (err) {
-    if (err) return res.status(500).json({ error: 'Ошибка генерации' });
-    res.json({ key });
-  });
-});
-
-// ✅ Активация ключа
-app.post('/activate-key', (req, res) => {
-  const { username, key } = req.body;
-  db.get('SELECT * FROM activation_keys WHERE key = ?', [key], (err, row) => {
-    if (err || !row) return res.status(400).json({ error: 'Неверный ключ' });
-
-    db.run('DELETE FROM activation_keys WHERE key = ?', [key]);
-    db.run(
-      `UPDATE users SET purchases = json_insert(purchases, '$[#]', ?) WHERE username = ?`,
-      ['Клиент активирован по ключу', username],
-      function (err2) {
-        if (err2) return res.status(500).json({ error: 'Ошибка обновления' });
-        res.json({ success: true });
-      }
-    );
-  });
-});
-
-app.listen(port, () => {
-  console.log(`✅ Сервер запущен на порту ${port}`);
-});
