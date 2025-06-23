@@ -15,13 +15,13 @@ const db = new sqlite3.Database('database.sqlite');
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
   const uid = Math.random().toString(36).substring(2, 10);
-  db.run('INSERT INTO users (username, password, uid, reg_date) VALUES (?, ?, ?, datetime())',
-    [username, password, uid],
-    function (err) {
-      if (err) return res.status(400).json({ error: 'Пользователь уже существует' });
-      res.json({ success: true, uid });
-    });
-});
+  db.run(`UPDATE users SET purchases = json_insert(purchases, '$[#]', ?) WHERE username = ?`,
+  [product, username],
+  function (err) {
+    if (err) return res.status(500).send('Ошибка при выдаче товара');
+    res.send('Товар выдан');
+  }
+);
 
 // Вход
 app.post('/login', (req, res) => {
