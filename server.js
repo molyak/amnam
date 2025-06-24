@@ -1,113 +1,115 @@
 const express = require('express');
+const fs = require('fs');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// ======= PostgreSQL подключение =======
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'amnam',
-  password: 'your_password', // замени на свой пароль
-  port: 5432
-});
-
-// ======= FRONTEND =======
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
-// ======= API: Регистрация =======
+const USERS_PATH = './data/users.json';
+const KEYS_PATH = './data/keys.json';
+const PURCHASES_PATH = './data/purchases.json';
+
+// ====== UTILS ======
+const readJSON = (path) => JSON.parse(fs.existsSync(path) ? fs.readFileSync(path) : '[]');
+const writeJSON = (path, data) => fs.writeFileSync(path, JSON.stringify(data, null, 2));
+
+// ====== REGISTER ======
 app.post('/api/register', async (req, res) => {
+  const users = readJSON(USERS_PATH);
   const { nickname, password } = req.body;
+  if (users.find(u => u.nickname === nickname)) return res.status(409).json({ error: 'Пользователь уже существует' });
   const hashed = await bcrypt.hash(password, 10);
-  const existing = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
-  if (existing.rows.length) return res.status(409).json({ error: 'Пользователь уже существует' });
-
-  const uid = uuidv4();
-  await pool.query(
-    'INSERT INTO users (uid, nickname, password) VALUES ($1, $2, $3)',
-    [uid, nickname, hashed]
-  );
-  res.json({ uid, nickname, is_admin: false });
+  const user = { uid: uuidv4(), nickname, password: hashed, is_admin: false, banned: false, registered_at: new Date().toISOString() };
+  users.push(user);
+  writeJSON(USERS_PATH, users);
+  res.json({ uid: user.uid, nickname: user.nickname, is_admin: false });
 });
 
-// ======= API: Вход =======
+// ====== LOGIN ======
 app.post('/api/login', async (req, res) => {
+  const users = readJSON(USERS_PATH);
   const { nickname, password } = req.body;
-  const result = await pool.query('SELECT * FROM users WHERE nickname = $1', [nickname]);
-  if (!result.rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
-
-  const user = result.rows[0];
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(403).json({ error: 'Неверный пароль' });
+  const user = users.find(u => u.nickname === nickname);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
   if (user.banned) return res.status(403).json({ error: 'Вы заблокированы' });
-
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) return res.status(403).json({ error: 'Неверный пароль' });
   res.json({ uid: user.uid, nickname: user.nickname, is_admin: user.is_admin });
 });
 
-// ======= API: Профиль =======
-app.get('/api/profile/:uid', async (req, res) => {
-  const { uid } = req.params;
-  const user = await pool.query('SELECT * FROM users WHERE uid = $1', [uid]);
-  if (!user.rows.length) return res.status(404).json({ error: 'Пользователь не найден' });
-
-  const purchases = await pool.query('SELECT * FROM purchases WHERE uid = $1', [uid]);
-  res.json({ user: user.rows[0], purchases: purchases.rows });
+// ====== PROFILE ======
+app.get('/api/profile/:uid', (req, res) => {
+  const users = readJSON(USERS_PATH);
+  const purchases = readJSON(PURCHASES_PATH);
+  const user = users.find(u => u.uid === req.params.uid);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+  const userPurchases = purchases.filter(p => p.uid === user.uid);
+  res.json({ user, purchases: userPurchases });
 });
 
-// ======= ADMIN API =======
+// ====== ACTIVATE KEY ======
+app.post('/api/activate-key', (req, res) => {
+  const keys = readJSON(KEYS_PATH);
+  const users = readJSON(USERS_PATH);
+  const purchases = readJSON(PURCHASES_PATH);
+  const { key, uid } = req.body;
+  const foundKey = keys.find(k => k.key === key && !k.used_by);
+  if (!foundKey) return res.status(400).json({ error: 'Ключ недействителен или уже использован' });
 
-// Выдать админку
-app.post('/admin/give-admin', async (req, res) => {
-  const { nickname } = req.body;
-  const result = await pool.query('UPDATE users SET is_admin = TRUE WHERE nickname = $1 RETURNING uid', [nickname]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Пользователь не найден' });
-  res.json({ message: `Админка выдана ${nickname}` });
+  const product = foundKey.product || 'Товар';
+  purchases.push({ uid, product, purchased_at: new Date().toISOString(), expires_at: null });
+  foundKey.used_by = uid;
+  writeJSON(PURCHASES_PATH, purchases);
+  writeJSON(KEYS_PATH, keys);
+  res.json({ message: 'Ключ активирован' });
 });
 
-// Выдать товар
-app.post('/admin/give-product', async (req, res) => {
-  const { uid, product } = req.body;
-  const purchased_at = new Date();
-  const expires_at = null;
-
-  await pool.query(
-    'INSERT INTO purchases (uid, product, purchased_at, expires_at) VALUES ($1, $2, $3, $4)',
-    [uid, product, purchased_at, expires_at]
-  );
-  res.json({ message: `Товар ${product} выдан UID: ${uid}` });
+// ====== ADMIN: GIVE ADMIN ======
+app.post('/admin/give-admin', (req, res) => {
+  const users = readJSON(USERS_PATH);
+  const user = users.find(u => u.nickname === req.body.nickname);
+  if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
+  user.is_admin = true;
+  writeJSON(USERS_PATH, users);
+  res.json({ message: 'Админка выдана' });
 });
 
-// Сгенерировать ключ
-app.post('/admin/generate-key', async (req, res) => {
+// ====== ADMIN: GENERATE KEY ======
+app.post('/admin/generate-key', (req, res) => {
+  const keys = readJSON(KEYS_PATH);
   const { product, days } = req.body;
   const key = uuidv4().replace(/-/g, '').slice(0, 16);
-
-  await pool.query(
-    'INSERT INTO keys (key, product, valid_days) VALUES ($1, $2, $3)',
-    [key, product, days]
-  );
+  keys.push({ key, product, valid_days: days, created_at: new Date().toISOString(), used_by: null });
+  writeJSON(KEYS_PATH, keys);
   res.json({ key });
 });
 
-// Заблокировать пользователя
-app.post('/admin/ban', async (req, res) => {
-  const { nickname } = req.body;
-  const result = await pool.query('UPDATE users SET banned = TRUE WHERE nickname = $1', [nickname]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Пользователь не найден' });
-  res.json({ message: `${nickname} заблокирован` });
+// ====== ADMIN: GIVE PRODUCT ======
+app.post('/admin/give-product', (req, res) => {
+  const purchases = readJSON(PURCHASES_PATH);
+  const { uid, product } = req.body;
+  purchases.push({ uid, product, purchased_at: new Date().toISOString(), expires_at: null });
+  writeJSON(PURCHASES_PATH, purchases);
+  res.json({ message: 'Товар выдан' });
 });
 
-// ======= СТАРТ СЕРВЕРА =======
+// ====== ADMIN: BAN USER ======
+app.post('/admin/ban', (req, res) => {
+  const users = readJSON(USERS_PATH);
+  const user = users.find(u => u.nickname === req.body.nickname);
+  if (!user) return res.status(404).json({ message: 'Пользователь не найден' });
+  user.banned = true;
+  writeJSON(USERS_PATH, users);
+  res.json({ message: 'Пользователь забанен' });
+});
+
+// ====== SERVER START ======
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Сервер запущен на http://localhost:${PORT}`);
+  console.log(`✅ Сервер запущен: http://localhost:${PORT}`);
 });
