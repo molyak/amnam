@@ -29,10 +29,7 @@
       animation: fadeIn 1s ease forwards;
     }
     @keyframes fadeIn {
-      to {
-        opacity: 1;
-        transform: none;
-      }
+      to { opacity: 1; transform: none; }
     }
     .gradient-border {
       background: linear-gradient(145deg, var(--accent), #14532d, var(--accent));
@@ -43,103 +40,16 @@
       width: 240px;
       transition: transform 0.4s ease;
       animation: glow 2s ease-in-out infinite alternate;
-      filter: drop-shadow(0 0 20px #16a34a);
+      filter: drop-shadow(0 0 20px var(--accent));
     }
     .glowing-amnyam:hover {
       transform: scale(1.1);
     }
     @keyframes glow {
-      from { filter: drop-shadow(0 0 10px #16a34a); }
-      to { filter: drop-shadow(0 0 30px #16a34a); }
+      from { filter: drop-shadow(0 0 10px var(--accent)); }
+      to { filter: drop-shadow(0 0 30px var(--accent)); }
     }
   </style>
-  <script>
-    const users = JSON.parse(localStorage.getItem('users')) || {};
-    const currentUser = localStorage.getItem('amnam_user');
-    const keys = JSON.parse(localStorage.getItem('activation_keys')) || [];
-
-    function register() {
-      const username = document.getElementById("regNick").value;
-      const password = document.getElementById("regPass").value;
-      const uid = generateUID();
-      if (users[username]) return alert("Пользователь уже существует");
-      users[username] = {
-        username, password, regDate: new Date().toISOString(), purchases: [], uid, isAdmin: false, isBlocked: false
-      };
-      localStorage.setItem("users", JSON.stringify(users));
-      localStorage.setItem("amnam_user", username);
-      location.reload();
-    }
-
-    function generateUID() {
-      return Math.random().toString(36).substring(2, 10);
-    }
-
-    function login() {
-      const username = document.getElementById("loginNick").value;
-      const password = document.getElementById("loginPass").value;
-      if (!users[username] || users[username].password !== password || users[username].isBlocked) {
-        return alert("Неверный ник, пароль или вы заблокированы");
-      }
-      localStorage.setItem("amnam_user", username);
-      location.reload();
-    }
-
-    function logout() {
-      localStorage.removeItem("amnam_user");
-      location.reload();
-    }
-
-    function showMain() {
-      document.getElementById('mainBlock').classList.remove('hidden');
-      document.getElementById('products').classList.add('hidden');
-      document.getElementById('profile').classList.add('hidden');
-    }
-
-    function showProducts() {
-      if (!currentUser) return alert("Сначала войдите в аккаунт");
-      document.getElementById('mainBlock').classList.add('hidden');
-      document.getElementById('products').classList.remove('hidden');
-      document.getElementById('profile').classList.add('hidden');
-    }
-
-    function showProfile() {
-      if (!currentUser) return alert("Сначала войдите в аккаунт");
-      document.getElementById('mainBlock').classList.add('hidden');
-      document.getElementById('products').classList.add('hidden');
-      document.getElementById('profile').classList.remove('hidden');
-    }
-
-    function activateKey() {
-      const enteredKey = document.getElementById("keyInput").value.trim();
-      if (!enteredKey) return;
-      const index = keys.indexOf(enteredKey);
-      if (index === -1) return alert("Неверный ключ");
-      users[currentUser].purchases.push("Активирован по ключу");
-      keys.splice(index, 1);
-      localStorage.setItem("activation_keys", JSON.stringify(keys));
-      localStorage.setItem("users", JSON.stringify(users));
-      alert("Ключ активирован! Товар выдан.");
-      showProfile();
-    }
-
-    window.onload = () => {
-      if (currentUser && users[currentUser]) {
-        document.getElementById("loginBtn").style.display = "none";
-        document.getElementById("registerBtn").style.display = "none";
-        const user = users[currentUser];
-        document.getElementById("profileInfo").innerHTML = `👤 ${user.username} <button onclick="logout()" class="underline ml-2">Выйти</button>`;
-        const profileContent = document.getElementById("profileContent");
-        profileContent.innerHTML = `
-          <p><b>Ник:</b> ${user.username}</p>
-          <p><b>UID:</b> ${user.uid}</p>
-          <p><b>Дата регистрации:</b> ${new Date(user.regDate).toLocaleDateString()}</p>
-          <p><b>Пароль:</b> <span id="hiddenPass">••••••••</span> <button onclick="document.getElementById('hiddenPass').innerText='${user.password}'" class="underline">Показать</button></p>
-          <p><b>Купленные товары:</b> ${user.purchases.length > 0 ? user.purchases.join(", ") : "—"}</p>
-        `;
-      }
-    }
-  </script>
 </head>
 <body>
 <header class="flex justify-between items-center px-6 py-4 border-b border-green-800">
@@ -148,9 +58,9 @@
     <span class="text-2xl font-bold text-[var(--accent)]">Amnam Client</span>
   </div>
   <nav class="flex space-x-4 text-sm text-gray-300">
-    <a href="#" onclick="showMain()" class="nav-link">Главная</a>
-    <a href="#" onclick="showProducts()" class="nav-link">Товары</a>
-    <a href="#" onclick="showProfile()" class="nav-link">Профиль</a>
+    <a href="#" onclick="showMain()">Главная</a>
+    <a href="#" onclick="showProducts()">Товары</a>
+    <a href="#" onclick="showProfile()">Профиль</a>
   </nav>
   <div class="space-x-2 text-sm text-white">
     <span id="profileInfo"></span>
@@ -158,6 +68,7 @@
     <button id="registerBtn" onclick="document.getElementById('registerModal').showModal()" class="bg-[var(--accent)] px-4 py-2 rounded">Регистрация</button>
   </div>
 </header>
+
 <main id="mainBlock" class="text-center py-16 px-4 fade-in">
   <h1 class="text-5xl font-bold mb-4">Amnam Client</h1>
   <p class="text-xl mb-6 text-[var(--accent)]">Лучший чит для Minecraft</p>
@@ -168,191 +79,140 @@
   <section class="py-16 px-4 fade-in">
     <h2 class="text-3xl font-bold text-center mb-8">Преимущества чита</h2>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105 cursor-pointer">
+      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105">
         <h3 class="text-lg font-bold mb-2">Обход античитов</h3>
         <p>Matrix, Vulcan, Spartan и др.</p>
       </div>
-      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105 cursor-pointer">
+      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105">
         <h3 class="text-lg font-bold mb-2">FPS+</h3>
         <p>Высокая производительность даже на слабых ПК.</p>
       </div>
-      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105 cursor-pointer">
+      <div class="gradient-border p-6 rounded-xl shadow-xl transition hover:scale-105">
         <h3 class="text-lg font-bold mb-2">UI/UX</h3>
         <p>Интуитивный красивый интерфейс без перегруза.</p>
       </div>
     </div>
   </section>
 </main>
+
 <section id="products" class="py-16 px-4 fade-in hidden">
   <h2 class="text-3xl font-bold text-center mb-10">Товары</h2>
   <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 transition text-center">
+    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 text-center">
       <h3 class="text-xl font-bold mb-2">Навсегда — 350 ₽</h3>
       <button onclick="window.location.href='https://t.me/HECIIPABEDLIBOSTb'" class="mt-2 px-4 py-2 bg-[var(--accent)] rounded">Купить</button>
     </div>
-    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 transition text-center">
+    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 text-center">
       <h3 class="text-xl font-bold mb-2">Год — 250 ₽</h3>
       <button onclick="window.location.href='https://t.me/HECIIPABEDLIBOSTb'" class="mt-2 px-4 py-2 bg-[var(--accent)] rounded">Купить</button>
     </div>
-    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 transition text-center">
+    <div class="gradient-border p-6 rounded-2xl shadow-xl hover:scale-105 text-center">
       <h3 class="text-xl font-bold mb-2">Месяц — 150 ₽</h3>
       <button onclick="window.location.href='https://t.me/HECIIPABEDLIBOSTb'" class="mt-2 px-4 py-2 bg-[var(--accent)] rounded">Купить</button>
     </div>
   </div>
-  <div class="mt-10 text-center">
-    <input id="keyInput" placeholder="Введите ключ" class="p-2 rounded bg-gray-800 text-white" />
-    <button onclick="activateKey()" class="ml-2 px-4 py-2 bg-[var(--accent)] rounded">Активировать</button>
-  </div>
 </section>
-<section id="profile" class="py-16 px-4 fade-in hidden">
-  <h2 class="text-3xl font-bold text-center mb-8">Личный кабинет</h2>
-  <div id="profileContent" class="text-center text-white space-y-2"></div>
-</section>
+
 <dialog id="loginModal" class="rounded-xl p-6 bg-gray-800 text-white">
   <form method="dialog" onsubmit="login(); return false;">
     <h3 class="text-xl font-bold mb-4">Вход</h3>
-    <input required type="text" id="loginNick" placeholder="Ник" class="w-full mb-3 px-3 py-2 rounded bg-gray-700">
-    <input required type="password" id="loginPass" placeholder="Пароль" class="w-full mb-4 px-3 py-2 rounded bg-gray-700">
-    <button type="submit" class="bg-[var(--accent)] px-4 py-2 rounded">Войти</button>
+    <input required id="loginNick" placeholder="Ник" class="w-full mb-3 px-3 py-2 rounded bg-gray-700">
+    <input required id="loginPass" type="password" placeholder="Пароль" class="w-full mb-4 px-3 py-2 rounded bg-gray-700">
+    <button class="bg-[var(--accent)] px-4 py-2 rounded">Войти</button>
   </form>
 </dialog>
+
 <dialog id="registerModal" class="rounded-xl p-6 bg-gray-800 text-white">
   <form method="dialog" onsubmit="register(); return false;">
     <h3 class="text-xl font-bold mb-4">Регистрация</h3>
-    <input required type="text" id="regNick" placeholder="Ник" class="w-full mb-3 px-3 py-2 rounded bg-gray-700">
-    <input required type="password" id="regPass" placeholder="Пароль" class="w-full mb-4 px-3 py-2 rounded bg-gray-700">
-    <button type="submit" class="bg-[var(--accent)] px-4 py-2 rounded">Зарегистрироваться</button>
+    <input required id="regNick" placeholder="Ник" class="w-full mb-3 px-3 py-2 rounded bg-gray-700">
+    <input required id="regPass" type="password" placeholder="Пароль" class="w-full mb-4 px-3 py-2 rounded bg-gray-700">
+    <button class="bg-[var(--accent)] px-4 py-2 rounded">Зарегистрироваться</button>
   </form>
 </dialog>
-</body>
-</html>
 
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Amnam Admin Panel</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background: radial-gradient(circle at 20% 20%, #10291c, #0a0f0a 70%);
-      color: #e0ffe5;
-      font-family: sans-serif;
-      animation: gradientFlow 20s ease infinite;
-      background-size: 400% 400%;
+<script>
+  function showMain() {
+    document.getElementById('mainBlock').classList.remove('hidden');
+    document.getElementById('products').classList.add('hidden');
+    document.getElementById('profile')?.remove();
+  }
+
+  function showProducts() {
+    document.getElementById('mainBlock').classList.add('hidden');
+    document.getElementById('products').classList.remove('hidden');
+    document.getElementById('profile')?.remove();
+  }
+
+  async function login() {
+    const nickname = document.getElementById('loginNick').value;
+    const password = document.getElementById('loginPass').value;
+
+    const res = await fetch('http://localhost:3000/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ nickname, password })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem('uid', data.uid);
+      localStorage.setItem('nickname', data.nickname);
+      showProfile();
+    } else {
+      alert(data.error);
     }
-    @keyframes gradientFlow {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
+  }
+
+  async function register() {
+    const nickname = document.getElementById('regNick').value;
+    const password = document.getElementById('regPass').value;
+
+    const res = await fetch('http://localhost:3000/api/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ nickname, password })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem('uid', data.uid);
+      localStorage.setItem('nickname', data.nickname);
+      showProfile();
+    } else {
+      alert(data.error);
     }
-    .fade-in {
-      opacity: 0;
-      transform: translateY(30px);
-      animation: fadeIn 0.8s ease-out forwards;
-    }
-    @keyframes fadeIn {
-      to {
-        opacity: 1;
-        transform: none;
-      }
-    }
-  </style>
-</head>
-<body class="p-6">
-  <div id="adminPanel" class="max-w-4xl mx-auto hidden fade-in">
-    <h1 class="text-3xl font-bold text-green-400 mb-6">Админ-панель Amnam</h1>
+  }
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-gray-800 p-4 rounded-xl">
-        <h2 class="text-xl font-semibold mb-2">Выдать товар по нику</h2>
-        <input type="text" id="giveNick" placeholder="Ник" class="w-full mb-2 p-2 rounded bg-gray-700 text-white">
-        <select id="giveProduct" class="w-full mb-2 p-2 rounded bg-gray-700 text-white">
-          <option value="Месяц">Месяц</option>
-          <option value="Год">Год</option>
-          <option value="Навсегда">Навсегда</option>
-        </select>
-        <button onclick="giveProduct()" class="bg-green-600 px-4 py-2 rounded hover:bg-green-700 transition">Выдать</button>
-      </div>
+  async function showProfile() {
+    const uid = localStorage.getItem('uid');
+    if (!uid) return alert("Вы не авторизованы");
 
-      <div class="bg-gray-800 p-4 rounded-xl">
-        <h2 class="text-xl font-semibold mb-2">Сделать админом</h2>
-        <input type="text" id="adminNick" placeholder="Ник" class="w-full mb-2 p-2 rounded bg-gray-700 text-white">
-        <button onclick="giveAdmin()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 transition">Выдать админку</button>
-      </div>
+    const res = await fetch(`http://localhost:3000/api/profile/${uid}`);
+    const data = await res.json();
 
-      <div class="bg-gray-800 p-4 rounded-xl">
-        <h2 class="text-xl font-semibold mb-2">Заблокировать пользователя</h2>
-        <input type="text" id="banNick" placeholder="Ник" class="w-full mb-2 p-2 rounded bg-gray-700 text-white">
-        <button onclick="blockUser()" class="bg-red-600 px-4 py-2 rounded hover:bg-red-700 transition">Заблокировать</button>
-      </div>
+    document.getElementById('mainBlock').classList.add('hidden');
+    document.getElementById('products').classList.add('hidden');
+    document.getElementById('profile')?.remove();
 
-      <div class="bg-gray-800 p-4 rounded-xl">
-        <h2 class="text-xl font-semibold mb-2">Сгенерировать ключ</h2>
-        <select id="keyType" class="w-full mb-2 p-2 rounded bg-gray-700 text-white">
-          <option value="30">30 дней</option>
-          <option value="365">365 дней</option>
-          <option value="forever">Навсегда</option>
-        </select>
-        <button onclick="generateKey()" class="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700 transition">Сгенерировать</button>
-        <p id="keyOutput" class="mt-2 text-green-300"></p>
-      </div>
-    </div>
-  </div>
+    const profile = document.createElement('section');
+    profile.id = 'profile';
+    profile.className = 'py-16 px-4 fade-in';
+    profile.innerHTML = `
+      <h2 class="text-3xl font-bold text-center mb-8">Профиль</h2>
+      <div class="max-w-xl mx-auto text-white bg-gray-900 p-6 rounded-xl">
+        <p><strong>Ник:</strong> ${data.user.nickname}</p>
+        <p><strong>UID:</strong> ${data.user.uid}</p>
+        <p><strong>Дата регистрации:</strong> ${new Date(data.user.registered_at).toLocaleString()}</p>
+        <hr class="my-4">
+        <h3 class="text-xl mb-2">Покупки:</h3>
+        <ul>
+          ${data.purchases.length ? data.purchases.map(p => `<li>${p.product} — ${new Date(p.purchased_at).toLocaleDateString()}</li>`).join('') : '<li>Нет покупок</li>'}
+        </ul>
+      </div>`;
+    document.body.appendChild(profile);
+  }
+</script>
 
-  <script>
-    fetch('https://amnam-st01.onrender.com/users')
-      .then(res => res.json())
-      .then(users => {
-        const current = localStorage.getItem('amnam_user');
-        const user = users.find(u => u.username === current);
-        if (user && user.is_admin) {
-          document.getElementById('adminPanel').classList.remove('hidden');
-        }
-      });
-
-    function giveProduct() {
-      const username = document.getElementById('giveNick').value;
-      const product = document.getElementById('giveProduct').value;
-      fetch('https://amnam-st01.onrender.com/admin/give-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, product })
-      }).then(res => res.json()).then(data => alert(data.success ? 'Выдано' : data.error));
-    }
-
-    function giveAdmin() {
-      const username = document.getElementById('adminNick').value;
-      fetch('https://amnam-st01.onrender.com/admin/give-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      }).then(res => res.json()).then(data => alert(data.success ? 'Админ выдан' : data.error));
-    }
-
-    function blockUser() {
-      const username = document.getElementById('banNick').value;
-      fetch('https://amnam-st01.onrender.com/admin/block-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username })
-      }).then(res => res.json()).then(data => alert(data.success ? 'Пользователь заблокирован' : data.error));
-    }
-
-    function generateKey() {
-      const duration = document.getElementById('keyType').value;
-      fetch('https://amnam-st01.onrender.com/admin/generate-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.key) document.getElementById('keyOutput').textContent = 'Ключ: ' + data.key;
-        else alert(data.error);
-      });
-    }
-  </script>
 </body>
 </html>
