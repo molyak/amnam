@@ -1,57 +1,101 @@
-fetch('http://localhost:3000/api/users')
-  .then((res) => res.json())
-  .then((users) => {
-    const current = localStorage.getItem('amnam_user');
-    const user = users.find((u) => u.username === current);
-    if (user && user.is_admin) {
-      document.getElementById('adminPanel').classList.remove('hidden');
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Админка — Amnam Client</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0f1912] text-white font-sans p-6">
+
+  <h1 class="text-3xl font-bold mb-6 text-green-400">Админ-панель Amnam Client</h1>
+
+  <div class="grid md:grid-cols-2 gap-6">
+
+    <!-- Выдача админки -->
+    <div class="bg-gray-900 p-4 rounded-xl">
+      <h2 class="text-xl font-bold mb-2">Выдать админку</h2>
+      <input id="adminNick" placeholder="Ник" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+      <button onclick="giveAdmin()" class="bg-green-600 px-4 py-2 rounded">Выдать</button>
+    </div>
+
+    <!-- Генерация ключа -->
+    <div class="bg-gray-900 p-4 rounded-xl">
+      <h2 class="text-xl font-bold mb-2">Создать ключ</h2>
+      <select id="keyDuration" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+        <option value="30">30 дней</option>
+        <option value="365">365 дней</option>
+        <option value="0">Навсегда</option>
+      </select>
+      <input id="keyProduct" placeholder="Название товара" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+      <button onclick="generateKey()" class="bg-green-600 px-4 py-2 rounded">Сгенерировать ключ</button>
+      <p id="generatedKey" class="mt-2 text-green-300"></p>
+    </div>
+
+    <!-- Выдача товара -->
+    <div class="bg-gray-900 p-4 rounded-xl">
+      <h2 class="text-xl font-bold mb-2">Выдать товар</h2>
+      <input id="uid" placeholder="UID пользователя" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+      <input id="productName" placeholder="Название товара" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+      <button onclick="giveProduct()" class="bg-green-600 px-4 py-2 rounded">Выдать</button>
+    </div>
+
+    <!-- Блокировка -->
+    <div class="bg-gray-900 p-4 rounded-xl">
+      <h2 class="text-xl font-bold mb-2">Заблокировать пользователя</h2>
+      <input id="banNick" placeholder="Ник пользователя" class="w-full px-3 py-2 rounded bg-gray-700 mb-3">
+      <button onclick="banUser()" class="bg-red-600 px-4 py-2 rounded">Заблокировать</button>
+    </div>
+
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000';
+
+    async function giveAdmin() {
+      const nick = document.getElementById('adminNick').value;
+      const res = await fetch(`${API}/admin/give-admin`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nickname: nick })
+      });
+      alert((await res.json()).message);
     }
-  });
 
-function giveProduct() {
-  const username = document.getElementById('giveNick').value;
-  const product = document.getElementById('giveProduct').value;
-  fetch('http://localhost:3000/api/admin/give-product', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, product }),
-  })
-    .then((res) => res.json())
-    .then((data) => alert(data.success ? 'Выдано' : data.error));
-}
+    async function generateKey() {
+      const days = parseInt(document.getElementById('keyDuration').value);
+      const product = document.getElementById('keyProduct').value;
 
-function giveAdmin() {
-  const username = document.getElementById('adminNick').value;
-  fetch('http://localhost:3000/api/admin/give-admin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username }),
-  })
-    .then((res) => res.json())
-    .then((data) => alert(data.success ?齊Админ выдан' : data.error));
-}
+      const res = await fetch(`${API}/admin/generate-key`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ product, days })
+      });
+      const data = await res.json();
+      document.getElementById('generatedKey').innerText = `Ключ: ${data.key}`;
+    }
 
-function blockUser() {
-  const username = document.getElementById('banNick').value;
-  fetch('http://localhost:3000/api/admin/block-user', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username }),
-  })
-    .then((res) => res.json())
-    .then((data) => alert(data.success ? 'Пользователь заблокирован' : data.error));
-}
+    async function giveProduct() {
+      const uid = document.getElementById('uid').value;
+      const product = document.getElementById('productName').value;
 
-function generateKey() {
-  const duration = document.getElementById('keyType').value;
-  fetch('http://localhost:3000/api/admin/generate-key', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ duration }),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.key) document.getElementById('keyOutput').textContent = 'Ключ: ' + data.key;
-      else alert(data.error);
-    });
-}
+      const res = await fetch(`${API}/admin/give-product`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ uid, product })
+      });
+      alert((await res.json()).message);
+    }
+
+    async function banUser() {
+      const nick = document.getElementById('banNick').value;
+      const res = await fetch(`${API}/admin/ban`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ nickname: nick })
+      });
+      alert((await res.json()).message);
+    }
+  </script>
+
+</body>
+</html>
